@@ -7,9 +7,12 @@ applications:
   path: .
   command: RAILS_ENV=$RAILS_ENV bundle exec rake cf:on_first_instance db:migrate && exec bundle exec rails s -p $PORT -e $RAILS_ENV
 qafire:
+  prepare: bin/prepare-qa.rb
   services:
-  - name: gov-au-beta
+  - name: notused
     plan: shared-pgsql
     type: dto-shared-pgsql
-  s3_bucket: bg-gov-au-beta-dbdumps
-  s3_key: db_prod_latest.sql
+    s3:
+      bucket: bg-gov-au-beta-dbdumps
+      key: db_prod_latest.sql
+  
