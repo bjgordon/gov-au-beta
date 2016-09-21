@@ -9,10 +9,10 @@ applications:
 qafire:
   prepare: bin/prepare-qa.rb
   services:
-  - name: notused
-    plan: shared-pgsql
+  - plan: shared-pgsql
     type: dto-shared-pgsql
-    s3:
-      bucket: bg-gov-au-beta-dbdumps
-      key: db_prod_latest.sql
+    seed:
+      s3:
+        bucket: bg-gov-au-beta-dbdumps
+        key: db_prod_latest.sql
   
