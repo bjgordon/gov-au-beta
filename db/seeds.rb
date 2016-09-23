@@ -8,57 +8,109 @@
 
 require 'synergy/cms_import'
 
-unless ENV['QAFIRE']
+password = ENV['SEED_USER_PASSWORD']
+raise 'SEED_USER_PASSWORD cannot be empty' if password.blank?
+
+unless admin = User.find_by(email: 'admin@example.gov.au')
+  admin = User.create!(email: 'admin@example.gov.au',
+                       password: password,
+                       confirmed_at: DateTime.now)
+end
+
+unless author = User.find_by(email: 'author@example.gov.au')
+  author = User.create!(email: 'author@example.gov.au',
+                        password: password,
+                        confirmed_at: DateTime.now)
+end
+
+unless reviewer = User.find_by(email: 'reviewer@example.gov.au')
+  reviewer = User.create!(email: 'reviewer@example.gov.au',
+                          password: password,
+                          confirmed_at: DateTime.now)
+end
+
+unless owner = User.find_by(email: 'owner@example.gov.au')
+  owner = User.create!(email: 'owner@example.gov.au',
+                       password: password,
+                       confirmed_at: DateTime.now)
+end
+
+admin.add_role :admin
+
+names = {
+    admin: [admin, %w(Joe Admin)],
+    author: [author, %w(Jane Author)],
+    reviewer: [reviewer, %w(John Reviewer)],
+    owner: [owner, %w(Sarah Owner)]
+}
+
+names.keys.each do |key|
+  names[key][0].first_name = names[key][1][0]
+  names[key][0].last_name = names[key][1][1]
+  names[key][0].save!
+end
+
+if ENV['QAFIRE']
+  Topic.all.each do |topic|
+    author.add_role :author, topic
+    reviewer.add_role :reviewer, topic
+    owner.add_role :owner, topic
+  end
+else
   RootNode.find_or_create_by!(state: 'published')
-  
+
   category = Category.find_or_create_by!(name: 'Infrastructure and telecommunications',
                                          short_summary: 'Transport safety, television reception, telecommunications.',
                                          summary: 'Australian Government information and services related to infrastructure and telecommunications.')
   category.save
-  subcategory = category.children.find_or_create_by!(name:'Infrastructure')
+  subcategory = category.children.find_or_create_by!(name: 'Infrastructure')
   leaf_category = subcategory.children.find_or_create_by!(name: 'Road')
-  
+
   topic = Topic.find_or_create_by!(name: 'Business')
   topic.summary = 'The business section covers a range of business-related topics.'
   topic.categories << leaf_category
   topic.save!
-  
+
+  author.add_role :author, topic
+  reviewer.add_role :reviewer, topic
+  owner.add_role :owner, topic
+
   news1 = NewsArticle.with_name(
       'Business News'
-    ).find_or_create_by!(
+  ).find_or_create_by!(
       {
-        section: topic,
-        state: :published,
+          section: topic,
+          state: :published,
       }
-    ) do |news_article|
-      news_article.name = 'Business News'
-      news_article.release_date = Date.today
-    end
+  ) do |news_article|
+    news_article.name = 'Business News'
+    news_article.release_date = Date.today
+  end
   news1.update(release_date: Date.today) if news1.release_date.blank?
   news1.revise!(content_body: 'foobar').apply!
-  
+
   def make_node(parent, name, klass = GeneralContent)
     # Note: you cannot find_by with :name because it's in the content jsonb field
     klass.with_name(name)
-      .find_or_create_by!(
-        {
-          state: :published,
-          parent: parent
-        }
-      ) do |node|
-        node.name = name
-      end
+        .find_or_create_by!(
+            {
+                state: :published,
+                parent: parent
+            }
+        ) do |node|
+      node.name = name
+    end
   end
-  
+
   node1 = make_node(topic.home_node, 'Starting a Business')
   node2 = make_node(node1, 'Finding Staff')
   node2.revise!(content_body: 'lorem ipsum').apply!
   node3 = make_node(node2, 'Types of Employment')
-  
+
   times = Topic.find_or_create_by!(name: 'Times and dates') do |topic|
     topic.summary = 'Australian times and dates'
   end
-  
+
   public_hols = make_node(times.home_node, 'Australian public holidays', CustomTemplateNode)
   public_hols.update(template: 'custom/public_holidays_tas')
   public_hols_tas = make_node(public_hols, 'Tasmania', CustomTemplateNode)
@@ -113,58 +165,14 @@ unless ENV['QAFIRE']
   school_hols_sa.update(template: 'custom/school_holidays_sa', options: {suppress_in_nav: true})
   school_hols_wa = make_node(school_hols, 'Western Australia', CustomTemplateNode)
   school_hols_wa.update(template: 'custom/school_holidays_wa', options: {suppress_in_nav: true})
-end
-password = ENV['SEED_USER_PASSWORD']
-raise 'SEED_USER_PASSWORD cannot be empty' if password.blank?
 
-unless admin = User.find_by(email: 'admin@example.gov.au')
-  admin = User.create!(email: 'admin@example.gov.au',
-                       password: password,
-                       confirmed_at: DateTime.now)
-end
+  node3.content_body = 'This is draft content I would like submitted'
 
-unless author = User.find_by(email: 'author@example.gov.au')
-  author = User.create!(email: 'author@example.gov.au',
-                        password: password,
-                        confirmed_at: DateTime.now)
-end
-
-unless reviewer = User.find_by(email: 'reviewer@example.gov.au')
-  reviewer = User.create!(email: 'reviewer@example.gov.au',
-                          password: password,
-                          confirmed_at: DateTime.now)
-end
-
-unless owner = User.find_by(email: 'owner@example.gov.au')
-  owner = User.create!(email: 'owner@example.gov.au',
-                       password: password,
-                       confirmed_at: DateTime.now)
-end
-
-admin.add_role :admin
-author.add_role :author, topic
-reviewer.add_role :reviewer, topic
-owner.add_role :owner, topic
-
-node3.content_body = 'This is draft content I would like submitted'
-
-if node3.submissions.blank?
-  sub = Submission.new(revision: node3.revise!(node3.content)).tap do |submission|
-    submission.submit!(author)
+  if node3.submissions.blank?
+    sub = Submission.new(revision: node3.revise!(node3.content)).tap do |submission|
+      submission.submit!(author)
+    end
   end
-end
-
-names = {
-    admin: [admin, %w(Joe Bloggs)],
-    author: [author, %w(Jane Doe)],
-    reviewer: [reviewer, %w(John Smith)],
-    owner: [owner, %w(Sarah Jones)]
-}
-
-names.keys.each do |key|
-  names[key][0].first_name = names[key][1][0]
-  names[key][0].last_name = names[key][1][1]
-  names[key][0].save!
 end
 
 Synergy::CMSImport.import_from_all_sections
