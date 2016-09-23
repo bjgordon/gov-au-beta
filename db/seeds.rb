@@ -8,51 +8,6 @@
 
 require 'synergy/cms_import'
 
-password = ENV['SEED_USER_PASSWORD']
-raise 'SEED_USER_PASSWORD cannot be empty' if password.blank?
-
-unless admin = User.find_by(email: 'admin@example.gov.au')
-  admin = User.create!(email: 'admin@example.gov.au',
-                       password: password,
-                       confirmed_at: DateTime.now)
-end
-
-unless author = User.find_by(email: 'author@example.gov.au')
-  author = User.create!(email: 'author@example.gov.au',
-                        password: password,
-                        confirmed_at: DateTime.now)
-end
-
-unless reviewer = User.find_by(email: 'reviewer@example.gov.au')
-  reviewer = User.create!(email: 'reviewer@example.gov.au',
-                          password: password,
-                          confirmed_at: DateTime.now)
-end
-
-unless owner = User.find_by(email: 'owner@example.gov.au')
-  owner = User.create!(email: 'owner@example.gov.au',
-                       password: password,
-                       confirmed_at: DateTime.now)
-end
-
-admin.add_role :admin
-author.add_role :author, topic
-reviewer.add_role :reviewer, topic
-owner.add_role :owner, topic
-
-names = {
-    admin: [admin, %w(Joe Bloggs)],
-    author: [author, %w(Jane Doe)],
-    reviewer: [reviewer, %w(John Smith)],
-    owner: [owner, %w(Sarah Jones)]
-}
-
-names.keys.each do |key|
-  names[key][0].first_name = names[key][1][0]
-  names[key][0].last_name = names[key][1][1]
-  names[key][0].save!
-end
-
 unless ENV['QAFIRE']
   RootNode.find_or_create_by!(state: 'published')
   
@@ -158,14 +113,58 @@ unless ENV['QAFIRE']
   school_hols_sa.update(template: 'custom/school_holidays_sa', options: {suppress_in_nav: true})
   school_hols_wa = make_node(school_hols, 'Western Australia', CustomTemplateNode)
   school_hols_wa.update(template: 'custom/school_holidays_wa', options: {suppress_in_nav: true})
-  
-  node3.content_body = 'This is draft content I would like submitted'
-  
-  if node3.submissions.blank?
-    sub = Submission.new(revision: node3.revise!(node3.content)).tap do |submission|
-      submission.submit!(author)
-    end
-  end
-  
-  Synergy::CMSImport.import_from_all_sections
 end
+password = ENV['SEED_USER_PASSWORD']
+raise 'SEED_USER_PASSWORD cannot be empty' if password.blank?
+
+unless admin = User.find_by(email: 'admin@example.gov.au')
+  admin = User.create!(email: 'admin@example.gov.au',
+                       password: password,
+                       confirmed_at: DateTime.now)
+end
+
+unless author = User.find_by(email: 'author@example.gov.au')
+  author = User.create!(email: 'author@example.gov.au',
+                        password: password,
+                        confirmed_at: DateTime.now)
+end
+
+unless reviewer = User.find_by(email: 'reviewer@example.gov.au')
+  reviewer = User.create!(email: 'reviewer@example.gov.au',
+                          password: password,
+                          confirmed_at: DateTime.now)
+end
+
+unless owner = User.find_by(email: 'owner@example.gov.au')
+  owner = User.create!(email: 'owner@example.gov.au',
+                       password: password,
+                       confirmed_at: DateTime.now)
+end
+
+admin.add_role :admin
+author.add_role :author, topic
+reviewer.add_role :reviewer, topic
+owner.add_role :owner, topic
+
+node3.content_body = 'This is draft content I would like submitted'
+
+if node3.submissions.blank?
+  sub = Submission.new(revision: node3.revise!(node3.content)).tap do |submission|
+    submission.submit!(author)
+  end
+end
+
+names = {
+    admin: [admin, %w(Joe Bloggs)],
+    author: [author, %w(Jane Doe)],
+    reviewer: [reviewer, %w(John Smith)],
+    owner: [owner, %w(Sarah Jones)]
+}
+
+names.keys.each do |key|
+  names[key][0].first_name = names[key][1][0]
+  names[key][0].last_name = names[key][1][1]
+  names[key][0].save!
+end
+
+Synergy::CMSImport.import_from_all_sections
